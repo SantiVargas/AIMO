@@ -1,0 +1,12 @@
+# Config Files
+config/*
+!config/default_config.cfg
+!config/default_domains_list.txt
+
+
+# VSCode Files
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
