@@ -1,6 +1,5 @@
 import time
 from datetime import datetime
-import tldextract as tld
 import pickle
 from ripe.atlas.cousteau import AtlasSource, Ping, Dns, AtlasCreateRequest, AtlasResultsRequest, Measurement, MeasurementRequest
 from ripe.atlas.sagan import PingResult, DnsResult
