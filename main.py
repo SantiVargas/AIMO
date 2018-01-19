@@ -1,3 +1,4 @@
+#!/usr/bin/env python3.5
 from ripe.atlas.cousteau import AtlasSource, Ping, Dns, AtlasCreateRequest, AtlasResultsRequest, Measurement, MeasurementRequest
 from ripe.atlas.sagan import PingResult, DnsResult
 import time
@@ -55,14 +56,19 @@ def main(config_file = 'config/default_config.cfg'):
          'domains_file': 'config/default_domains_list.txt'
       },
       'probe': {
-        'country_code': 'US'
+        'requested': 1,
+        'type': 'country',
+        'value': 'US'
       }
     }
     config = configparser.ConfigParser(defaults= config_defaults)
     config.read(config_file)
     api_key = config.get('main', 'api_key')
     domains_file = config.get('main', 'domains_file')
-    country_code = config.get('probe', 'country_code')
+    probe_type = config.get('probe', 'type')
+    probe_value = config.get('probe', 'value')
+    probe_requested = config.get('probe', 'requested')
+    probe_tags = {'include': ['system-ipv4-works']}
 
     # Constants
     # Todo: Consider moving these to the config file
@@ -82,49 +88,20 @@ def main(config_file = 'config/default_config.cfg'):
     logger.debug('Domains:')
     logger.debug(domains)
 
+    # Create the probe source
+    probe_source = [AtlasSource(type=probe_type, value=probe_value, requested=int(probe_requested), tags=probe_tags)]
+
     ## Get the data
     logger.info('Getting Data')
 
-    # Obtain a probe id using the first domain
-    probe_tags = {'include': ['system-ipv4-works']}
-    # Todo: In the future, allow the config to specify country, probe, etc...
-    first_probe = [AtlasSource(type='country', value=country_code, requested=1, tags=probe_tags)]
-    logger.info('Creating the first measurement')
-    first_domain = domains[0]    
-    first_measurement = [Ping(af=4, target=first_domain, description='Ping to ' + first_domain)]
-    # Create first measurement
-    success, first_request_ids = measurements.create_measurements(api_key, first_measurement, first_probe)
-    logger.debug('Create first measurement success: ' + str(success))
-    logger.debug('Results: ' + str(first_request_ids))
-    if not success:
-        logger.error('Error when creating measurement for the first domain')
-        return None
-    logger.debug('Retrieving measurments of id: ' + str(first_request_ids))
-    # Get the probe id
-    results = measurements.retrieve_measurement_results(first_request_ids, retrieve_measurements_timeout)
-    first_result = next(iter(results.values()))[0]
-    probe_id = first_result['prb_id']
-    logger.debug('Probe: ' + str(probe_id))
-
-    # Create the probe source
-    probe_source = [AtlasSource(type='probes', value=str(probe_id), requested=1, tags=probe_tags)]
-
-    # Create subsequent ping measurements
+    # Create ping measurements
     logger.info('Creating ping measurements')
-    ping_measurements = [Ping(af=4, target=domain, description='Ping to ' + domain) for domain in domains[1:]]
-    final_ping_request_ids = first_request_ids
-    success, request_ids = measurements.create_measurements(api_key, ping_measurements, probe_source)
-    logger.debug('Create ping measurement success: ' + str(success))
-    logger.debug('Ping results: ' + str(request_ids))
-    final_ping_request_ids += request_ids
-    # Write all final ping request ids to file
-    logger.info('Storing ping ids')
-    ping_req_id_file = open(ping_request_id_file, 'w+')
-    for req_id in final_ping_request_ids:
-        ping_req_id_file.write('%s \n' % req_id)
-    ping_req_id_file.close()
-    if not success:
-        logger.error('Error when creating all measurements')
+    ping_measurements = [Ping(af=4, target=domain, description='Ping to ' + domain) for domain in domains]
+    ping_success, final_ping_request_ids = measurements.create_measurements(api_key, ping_measurements, probe_source)
+    logger.debug('Create ping measurement success: ' + str(ping_success))
+    logger.debug('Ping results: ' + str(final_ping_request_ids))
+    if not ping_success:
+        logger.error('Error when creating ping measurements')
         return None
     # Get the results
     logger.info('Retrieving ping measurements')
@@ -144,21 +121,29 @@ def main(config_file = 'config/default_config.cfg'):
     logger.info('Creating dns measurements')
     dns_measurements = [Dns(af=4, query_class='IN', query_argument=domain, query_type='A', use_probe_resolver=True,
                                include_abuf=True, retry=5, description='DNS A request for ' + domain) for domain in domains]
-    success, final_dns_request_ids = measurements.create_measurements(api_key, dns_measurements, probe_source)
-    logger.debug('Create dns measurement success: ' + str(success))
+    dns_success, final_dns_request_ids = measurements.create_measurements(api_key, dns_measurements, probe_source)
+    logger.debug('Create dns measurement success: ' + str(dns_success))
     logger.debug('Dns results: ' + str(final_dns_request_ids))
+    if not dns_success:
+        logger.error('Error when creating dns measurements')
+        return None
+    # Get the results
+    logger.info('Retrieving dns measurements')
+    dns_results = measurements.retrieve_measurement_results(final_dns_request_ids, retrieve_measurements_timeout)
+
+    # Write all final ping request ids to file
+    logger.info('Storing ping ids')
+    ping_req_id_file = open(ping_request_id_file, 'w+')
+    for req_id in final_ping_request_ids:
+        ping_req_id_file.write('%s \n' % req_id)
+    ping_req_id_file.close()
     # Write all final dns request ids to file
     logger.info('Storing dns ids')
     dns_req_id_file = open(dns_request_id_file, 'w+')
     for req_id in final_dns_request_ids:
         dns_req_id_file.write('%s \n' % req_id)
     dns_req_id_file.close()
-    if not success:
-        logger.error('Error when creating all dns measurements')
-        return None
-    # Get the results
-    logger.info('Retrieving dns measurements')
-    dns_results = measurements.retrieve_measurement_results(final_dns_request_ids, retrieve_measurements_timeout)
+
     # Format the output
     logger.info('Formatting dns results')
     formatted_dns_results = format_results_for_testbed(dns_results)
