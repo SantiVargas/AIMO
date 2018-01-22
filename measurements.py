@@ -50,7 +50,7 @@ def create_measurements(api_key, measurements, sources):
 
     return success_list, request_ids
 
-def retrieve_measurement_results(measurement_ids, polling_interval):
+def get_measurement_results(measurement_ids, polling_interval):
     ## Retrieve measurement results
 
     # Copy the list
