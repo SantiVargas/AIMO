@@ -58,7 +58,7 @@ def save_measurements(request_ids, request_ids_file, results, results_file):
     logger.info('Storing formatted results')
     with open(results_file, 'wb+') as r_file:
         pickler = pickle.Pickler(r_file, -1)
-        pickler.dump(formatted_ping_results)
+        pickler.dump(results)
     logger.info('Results stored')
 
 def measure_ping_and_dns(api_key, domains, probe_type, probe_value, probe_requested, probe_tags):
@@ -103,13 +103,15 @@ if __name__ == '__main__':
     ch.setFormatter(formatter)
     # Used to output to a file
     log_file = 'main.log'
+    # Clear the log file
+    open(log_file, 'w').close()
     fh = logging.FileHandler(log_file)
     fh.setLevel(logging.DEBUG)
     fh.setFormatter(formatter)
     logger.addHandler(ch)
     logger.addHandler(fh)
 
-    ## Get arguments
+    # Get arguments
     # Get config argument
     config_file = sys.argv[1]
 
@@ -150,15 +152,14 @@ if __name__ == '__main__':
             domains.append(line.strip())
     logger.debug('Domains:')
     logger.debug(domains)
-    
-    # Run the script
+
     ping_ids, ping_results, dns_ids, dns_results = measure_ping_and_dns(api_key, domains, probe_type, probe_value, probe_requested, probe_tags)
     # Format the output
     logger.info('Formatting results')
     formatted_ping_results = format_results_for_testbed(ping_results)
     formatted_dns_results = format_results_for_testbed(dns_results)
     # Save data
+    logger.info('Storing Results')
     save_measurements(ping_ids, ping_request_id_file, formatted_ping_results, output_ping_file)
     save_measurements(dns_ids, dns_request_id_file, formatted_dns_results, output_dns_file)
     logger.info('Terminating...')
-
