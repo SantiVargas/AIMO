@@ -134,7 +134,7 @@ if __name__ == '__main__':
     probe_type = config.get('probe', 'type')
     probe_value = config.get('probe', 'value')
     probe_requested = config.get('probe', 'requested')
-    probe_tags = {'include': ['system-ipv4-works']}
+    probe_tags = {'include': ['system-ipv4-works','system-resolves-a-correctly']}
 
     # File names
     # Todo: Add to config file?
