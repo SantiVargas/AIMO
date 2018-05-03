@@ -3,12 +3,11 @@ from ripe.atlas.cousteau import AtlasSource, Ping, Dns, AtlasCreateRequest, Atla
 from ripe.atlas.sagan import PingResult, DnsResult
 import time
 import tldextract as tld
-import pickle
 import configparser
 import sys
 
 # Internal Libraries
-import measurements
+import measurements, util
 
 # Logger
 import logging
@@ -48,48 +47,24 @@ def format_results_for_testbed(results):
 
     return formatted_results
 
-def save_measurements(request_ids, request_ids_file, results, results_file):
-    # Write all request ids to file
-    logger.info('Storing request ids')
-    with open(request_ids_file, 'w+') as req_id_file:
-        for req_id in request_ids:
-            req_id_file.write('%s \n' % req_id)
-    # Storing results
-    logger.info('Storing formatted results')
-    with open(results_file, 'wb+') as r_file:
-        pickler = pickle.Pickler(r_file, -1)
-        pickler.dump(results)
-    logger.info('Results stored')
-
 def measure_ping_and_dns(api_key, domains, probe_type, probe_value, probe_requested, probe_tags):
     # Todo: Make this a parameter?
     retrieve_measurements_timeout = 5   # Seconds
     
     # Create the probe source
     probe_source = [AtlasSource(type=probe_type, value=probe_value, requested=int(probe_requested), tags=probe_tags)]
-
     ## Get the data
     # Create ping measurements
     logger.info('Creating ping measurements')
     ping_measurements = [Ping(af=4, target=domain, description='Ping to ' + domain) for domain in domains]
-    success, ping_request_ids = measurements.create_measurements(api_key, ping_measurements, probe_source)
-    logger.debug('Create measurements success: ' + str(success))
-    logger.debug('Measurement results: ' + str(ping_request_ids))
-    # Get the results
-    logger.info('Retrieving measurement results')
-    ping_results = measurements.get_measurement_results(ping_request_ids, retrieve_measurements_timeout)
+    success, ping_request_ids, ping_results = measurements.run_measurements(api_key, ping_measurements, probe_source, retrieve_measurements_timeout)
     
     # Create subsequent dns measurements
     logger.info('Creating dns measurements')
     dns_measurements = [Dns(af=4, query_class='IN', query_argument=domain, query_type='A', use_probe_resolver=True,
                                include_abuf=True, retry=5, description='DNS A request for ' + domain) for domain in domains]
-    success, dns_request_ids = measurements.create_measurements(api_key, dns_measurements, probe_source)
-    logger.debug('Create measurements success: ' + str(success))
-    logger.debug('Measurement results: ' + str(dns_request_ids))
-    # Get the results
-    logger.info('Retrieving measurement results')
-    dns_results = measurements.get_measurement_results(dns_request_ids, retrieve_measurements_timeout)
-
+    success, dns_request_ids, dns_results = measurements.run_measurements(api_key, dns_measurements, probe_source, retrieve_measurements_timeout)
+    
     return ping_request_ids, ping_results, dns_request_ids, dns_results
 
 if __name__ == '__main__':
@@ -144,22 +119,33 @@ if __name__ == '__main__':
     output_dns_file = 'dns_data'
 
     # Get domains list from a file
-    domains = []
     logger.info('Reading domains file')
-    with open(domains_file) as df:
-        for line in df:
-            logger.debug(line.strip())
-            domains.append(line.strip())
+    domains = util.list_from_file(domains_file)
+    domains = [x.strip() for x in domains]
     logger.debug('Domains:')
     logger.debug(domains)
 
-    ping_ids, ping_results, dns_ids, dns_results = measure_ping_and_dns(api_key, domains, probe_type, probe_value, probe_requested, probe_tags)
+    # Create new measurements
+    # ping_ids, ping_results, dns_ids, dns_results = measure_ping_and_dns(api_key, domains, probe_type, probe_value, probe_requested, probe_tags)
+
+    # Get ids from file and retrieve measurements
+    ping_ids = util.list_from_file(ping_request_id_file)
+    ping_ids = [x.strip() for x in ping_ids]
+    dns_ids = util.list_from_file(dns_request_id_file)
+    dns_ids = [x.strip() for x in dns_ids]
+    ping_results = measurements.get_measurement_results(ping_ids, 5)
+    dns_results = measurements.get_measurement_results(dns_ids, 5)
+
+    # Save ids
+    logger.info('Storing request ids')
+    util.list_to_file(ping_ids, ping_request_id_file)
+    util.list_to_file(dns_ids, dns_request_id_file)
     # Format the output
     logger.info('Formatting results')
     formatted_ping_results = format_results_for_testbed(ping_results)
     formatted_dns_results = format_results_for_testbed(dns_results)
-    # Save data
-    logger.info('Storing Results')
-    save_measurements(ping_ids, ping_request_id_file, formatted_ping_results, output_ping_file)
-    save_measurements(dns_ids, dns_request_id_file, formatted_dns_results, output_dns_file)
+    # Save results data
+    logger.info('Storing formatted results')
+    util.file_pickler(formatted_ping_results, output_ping_file)
+    util.file_pickler(formatted_dns_results, output_dns_file)
     logger.info('Terminating...')

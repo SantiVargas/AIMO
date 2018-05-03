@@ -85,3 +85,12 @@ def get_measurement_results(measurement_ids, polling_interval):
             i += 1
 
     return results
+
+# Creates measurements and gets measurement results. Will perform chunking and polling.
+def run_measurements(api_key, measurements, probe_sources, timeout):
+    success, ping_request_ids = measurements.create_measurements(api_key, measurements, probe_sources)
+    logger.debug('Create measurements success: ' + str(success))
+    logger.debug('Measurement results: ' + str(ping_request_ids))
+    logger.debug('Retrieving measurement results')
+    ping_results = measurements.get_measurement_results(ping_request_ids, timeout)
+    return success, ping_request_ids, ping_results
