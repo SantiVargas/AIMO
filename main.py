@@ -126,15 +126,15 @@ if __name__ == '__main__':
     logger.debug(domains)
 
     # Create new measurements
-    # ping_ids, ping_results, dns_ids, dns_results = measure_ping_and_dns(api_key, domains, probe_type, probe_value, probe_requested, probe_tags)
+    ping_ids, ping_results, dns_ids, dns_results = measure_ping_and_dns(api_key, domains, probe_type, probe_value, probe_requested, probe_tags)
 
     # Get ids from file and retrieve measurements
-    ping_ids = util.list_from_file(ping_request_id_file)
-    ping_ids = [x.strip() for x in ping_ids]
-    dns_ids = util.list_from_file(dns_request_id_file)
-    dns_ids = [x.strip() for x in dns_ids]
-    ping_results = measurements.get_measurement_results(ping_ids, 5)
-    dns_results = measurements.get_measurement_results(dns_ids, 5)
+    # ping_ids = util.list_from_file(ping_request_id_file)
+    # ping_ids = [x.strip() for x in ping_ids]
+    # dns_ids = util.list_from_file(dns_request_id_file)
+    # dns_ids = [x.strip() for x in dns_ids]
+    # ping_results = measurements.get_measurement_results(ping_ids, 5)
+    # dns_results = measurements.get_measurement_results(dns_ids, 5)
 
     # Save ids
     logger.info('Storing request ids')
